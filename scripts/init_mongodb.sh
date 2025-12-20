@@ -14,16 +14,16 @@ echo "Checking if database needs seeding..."
 COLLECTIONS=$(mongosh "$MONGODB_URI/$DATABASE" --quiet --eval 'db.getCollectionNames().length')
 
 if [ "$COLLECTIONS" -gt 0 ]; then
-    echo "✓ Database already has $COLLECTIONS collections. Skipping seed."
+    echo "âœ“ Database already has $COLLECTIONS collections. Skipping seed."
     exit 0
 fi
 
 # Check if dump directory exists and has data
 if [ ! -d "$DUMP_PATH/$DATABASE" ]; then
-    echo "⚠️  No seed data found at $DUMP_PATH/$DATABASE. Skipping."
+    echo "âš ï¸  No seed data found at $DUMP_PATH/$DATABASE. Skipping."
     exit 0
 fi
 
-echo "📦 Database is empty. Restoring seed data..."
+echo "ðŸ“¦ Database is empty. Restoring seed data..."
 mongorestore --uri "$MONGODB_URI" "$DUMP_PATH"
-echo "✅ Seed data restored successfully!"
+echo "âœ… Seed data restored successfully!"

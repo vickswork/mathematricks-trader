@@ -292,7 +292,7 @@ function Send-TestSignal {
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
         Write-Success "Test signal sent successfully"
-    }
+bXN    }
     else {
         Write-Error-Message "Failed to send test signal"
         return

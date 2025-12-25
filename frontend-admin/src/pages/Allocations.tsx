@@ -23,6 +23,10 @@ export const Allocations: React.FC = () => {
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>([]);
   const [selectedConstructor, setSelectedConstructor] = useState<string>('max_hybrid');
   const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [maxLeverage, setMaxLeverage] = useState<number>(2.3);
+  const [maxDrawdownLimit, setMaxDrawdownLimit] = useState<number>(-0.06);
+  const [alpha, setAlpha] = useState<number>(0.85);
 
   // ============================================================================
   // API QUERIES
@@ -75,8 +79,8 @@ export const Allocations: React.FC = () => {
 
   // Run new portfolio test (Part 4)
   const runTestMutation = useMutation({
-    mutationFn: (params: { strategies: string[]; constructor: string }) =>
-      apiClient.runPortfolioTest(params.strategies, params.constructor),
+    mutationFn: (params: { strategies: string[]; constructor: string; constructorParams?: Record<string, any> }) =>
+      apiClient.runPortfolioTest(params.strategies, params.constructor, params.constructorParams),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portfolioTests'] });
       // Auto-scroll to Part 3 after test completes
@@ -158,9 +162,38 @@ export const Allocations: React.FC = () => {
       alert('Please select at least one strategy');
       return;
     }
+    
+    // Build constructor params based on selected constructor
+    let constructorParams: Record<string, any> | undefined = undefined;
+    
+    if (selectedConstructor === 'max_hybrid') {
+      constructorParams = {
+        max_leverage: maxLeverage,
+        max_drawdown_limit: maxDrawdownLimit,
+        alpha: alpha,
+        use_fixed_allocations: false  // Always use dynamic optimization in research lab
+      };
+    } else if (selectedConstructor === 'max_cagr' || selectedConstructor === 'max_cagr_v2') {
+      constructorParams = {
+        max_leverage: maxLeverage,
+        max_drawdown_limit: Math.abs(maxDrawdownLimit)  // These constructors use positive values
+      };
+    } else if (selectedConstructor === 'max_sharpe') {
+      constructorParams = {
+        max_leverage: maxLeverage,
+        max_drawdown_limit: Math.abs(maxDrawdownLimit)
+      };
+    } else if (selectedConstructor === 'max_cagr_sharpe') {
+      constructorParams = {
+        max_leverage: maxLeverage,
+        max_drawdown_limit: maxDrawdownLimit
+      };
+    }
+    
     runTestMutation.mutate({
       strategies: selectedStrategies,
       constructor: selectedConstructor,
+      constructorParams: constructorParams
     });
   };
 
@@ -726,6 +759,131 @@ export const Allocations: React.FC = () => {
             <option value="max_cagr_v2">MaxCAGR v2 - Growth Optimized</option>
             <option value="max_cagr_sharpe">MaxCAGR+Sharpe - Hybrid Growth</option>
           </select>
+        </div>
+
+        {/* Advanced Settings */}
+        <div className="mb-6">
+          <button
+            onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+            className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-2"
+          >
+            {showAdvancedSettings ? '▼' : '▶'} Advanced Settings
+          </button>
+          
+          {showAdvancedSettings && (
+            <div className="mt-4 p-4 bg-gray-700/50 rounded-lg space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Max Leverage (multiplier)
+                  <span className="text-gray-400 ml-2 font-normal">
+                    Current: {maxLeverage}x ({(maxLeverage * 100).toFixed(0)}%)
+                  </span>
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1.0"
+                    max="5.0"
+                    step="0.1"
+                    value={maxLeverage}
+                    onChange={(e) => setMaxLeverage(parseFloat(e.target.value))}
+                    className="flex-1 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  />
+                  <input
+                    type="number"
+                    min="1.0"
+                    max="5.0"
+                    step="0.1"
+                    value={maxLeverage}
+                    onChange={(e) => setMaxLeverage(parseFloat(e.target.value) || 2.3)}
+                    className="w-20 px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  ⚠️ Higher leverage = higher returns but also higher risk. The optimizer will respect margin constraints.
+                </p>
+              </div>
+
+              {selectedConstructor === 'max_hybrid' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Alpha (Sharpe vs CAGR weight)
+                    <span className="text-gray-400 ml-2 font-normal">
+                      Current: {alpha.toFixed(2)} ({(alpha * 100).toFixed(0)}% Sharpe, {((1-alpha) * 100).toFixed(0)}% CAGR)
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="0.0"
+                      max="1.0"
+                      step="0.05"
+                      value={alpha}
+                      onChange={(e) => setAlpha(parseFloat(e.target.value))}
+                      className="flex-1 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                    <input
+                      type="number"
+                      min="0.0"
+                      max="1.0"
+                      step="0.05"
+                      value={alpha}
+                      onChange={(e) => setAlpha(parseFloat(e.target.value) || 0.85)}
+                      className="w-20 px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Higher alpha = prioritize risk-adjusted returns (Sharpe). Lower alpha = prioritize growth (CAGR).
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Max Drawdown Limit
+                  <span className="text-gray-400 ml-2 font-normal">
+                    Current: {(maxDrawdownLimit * 100).toFixed(1)}%
+                  </span>
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="-0.30"
+                    max="-0.02"
+                    step="0.01"
+                    value={maxDrawdownLimit}
+                    onChange={(e) => setMaxDrawdownLimit(parseFloat(e.target.value))}
+                    className="flex-1 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  />
+                  <input
+                    type="number"
+                    min="-0.30"
+                    max="-0.02"
+                    step="0.01"
+                    value={maxDrawdownLimit}
+                    onChange={(e) => setMaxDrawdownLimit(parseFloat(e.target.value) || -0.06)}
+                    className="w-20 px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Maximum allowed portfolio drawdown. More negative = more risk tolerance.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-gray-600">
+                <button
+                  onClick={() => {
+                    setMaxLeverage(2.3);
+                    setMaxDrawdownLimit(-0.06);
+                    setAlpha(0.85);
+                  }}
+                  className="text-sm text-gray-400 hover:text-white"
+                >
+                  Reset to Defaults
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Strategy Selection */}

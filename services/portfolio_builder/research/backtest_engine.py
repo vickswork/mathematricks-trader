@@ -221,7 +221,8 @@ class WalkForwardBacktest:
 
                     # Margin limit parameters (needed for calculation)
                     account_equity = current_equity
-                    max_leverage = 2.3  # Should match constructor's max_leverage
+                    # Get max_leverage from constructor (default to 2.3 if not available)
+                    max_leverage = getattr(self.constructor, 'max_leverage', 2.3)
                     margin_safety_factor = 0.8
                     max_allowed_margin = account_equity * max_leverage * margin_safety_factor
 

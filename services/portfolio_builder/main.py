@@ -9,6 +9,7 @@ Port: 8003
 
 import os
 import sys
+import json
 import logging
 import subprocess
 import shutil
@@ -525,10 +526,23 @@ async def run_portfolio_test(request: Dict[str, Any]):
     """
     Run a new portfolio optimization test (Research Lab)
     Runs construct_portfolio.py with selected strategies and saves results to MongoDB
+    
+    Request body:
+    {
+        "strategies": ["strategy1", "strategy2"],
+        "constructor": "max_hybrid",
+        "constructor_params": {  // Optional
+            "max_leverage": 2.5,
+            "max_drawdown_limit": -0.06,
+            "alpha": 0.85,
+            ...
+        }
+    }
     """
     try:
         strategies = request.get('strategies', [])
         constructor = request.get('constructor', 'max_hybrid')
+        constructor_params = request.get('constructor_params', {})
 
         if not strategies or len(strategies) == 0:
             raise HTTPException(status_code=400, detail="At least one strategy must be selected")
@@ -539,10 +553,26 @@ async def run_portfolio_test(request: Dict[str, Any]):
         logger.info(f"🔬 Running portfolio test: {test_id}")
         logger.info(f"   Constructor: {constructor}")
         logger.info(f"   Strategies: {strategies}")
+        if constructor_params:
+            logger.info(f"   Constructor Params: {constructor_params}")
 
         # Create output directory for this test in research/outputs
         test_output_dir = f"{RESEARCH_OUTPUTS_DIR}/{test_id}"
         os.makedirs(test_output_dir, exist_ok=True)
+
+        # If constructor params provided, create a config file
+        config_path = None
+        if constructor_params:
+            config_path = f"{test_output_dir}/constructor_config.json"
+            config_data = {
+                "constructor": {
+                    "type": constructor,
+                    "config": constructor_params
+                }
+            }
+            with open(config_path, 'w') as f:
+                json.dump(config_data, f, indent=2)
+            logger.info(f"   Config file created: {config_path}")
 
         # Run construct_portfolio.py with output directory set to test folder
         cmd = [
@@ -552,6 +582,10 @@ async def run_portfolio_test(request: Dict[str, Any]):
             "--strategies", ",".join(strategies),
             "--output-dir", test_output_dir
         ]
+        
+        # Add config file if provided
+        if config_path:
+            cmd.extend(["--config", config_path])
 
         logger.info(f"Executing: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)

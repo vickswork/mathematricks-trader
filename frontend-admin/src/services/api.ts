@@ -150,11 +150,15 @@ class ApiClient {
   }
 
   // Part 4: Run Portfolio Test (Research Lab)
-  async runPortfolioTest(strategies: string[], constructor: string) {
-    const response = await this.portfolioBuilderClient.post('/api/v1/portfolio-tests/run', {
+  async runPortfolioTest(strategies: string[], constructor: string, constructorParams?: Record<string, any>) {
+    const payload: any = {
       strategies,
       constructor
-    });
+    };
+    if (constructorParams && Object.keys(constructorParams).length > 0) {
+      payload.constructor_params = constructorParams;
+    }
+    const response = await this.portfolioBuilderClient.post('/api/v1/portfolio-tests/run', payload);
     return response.data;
   }
 

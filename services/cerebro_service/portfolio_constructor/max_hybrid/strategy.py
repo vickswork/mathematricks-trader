@@ -515,11 +515,14 @@ class MaxHybridConstructor(PortfolioConstructor):
 
             return slack
         
-        # Constraints (margin scaling happens post-optimization in backtest_engine)
+        # Constraints
+        # NOTE: Margin constraint is now ACTIVE in optimizer (not just post-optimization)
+        # This allows optimizer to find allocations that respect margin limits proactively
         constraints = [
             {'type': 'ineq', 'fun': lambda w: self.max_leverage - np.sum(w)},  # Total allocation <= max_leverage
             {'type': 'ineq', 'fun': lambda w: np.sum(w)},                       # Total allocation >= 0
             {'type': 'ineq', 'fun': drawdown_constraint},                       # Max DD <= limit
+            {'type': 'ineq', 'fun': margin_constraint},                         # Margin usage <= limit (ACTIVE)
         ]
         
         log_opt(f"\n🔧 RUNNING SCIPY OPTIMIZATION (SLSQP)...")
